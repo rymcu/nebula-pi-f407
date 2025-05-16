@@ -1,26 +1,26 @@
 #ifndef __SD_CARD_H
 #define __SD_CARD_H
 
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 
-// SD¿¨ÀàĞÍ¶¨Òå
+// SDå¡ç±»å‹å®šä¹‰
 #define SD_TYPE_ERR     0x00
 #define SD_TYPE_MMC     0x01
 #define SD_TYPE_V1      0x02
 #define SD_TYPE_V2      0x04
 #define SD_TYPE_V2HC    0x06
 
-// SD¿¨Ö¸Áî±í
-#define CMD0    0       // ¿¨¸´Î»
-#define CMD8    8       // ·¢ËÍ½Ó¿ÚÌõ¼ş
-#define CMD55   55      // APPÃüÁîÇ°×º
-#define CMD41   41      // ³õÊ¼»¯ÃüÁî
-#define CMD58   58      // ¶ÁOCR¼Ä´æÆ÷
-#define CMD17   17      //ÃüÁî17£¬¶Ásector
-#define CMD24   24      //ÃüÁî24£¬Ğ´sector
-#define CMD9    9       //ÃüÁî9 £¬¶ÁCSDÊı¾İ
-#define CMD12   12      //Í£Ö¹Êı¾İ´«ËÍ
-// È«¾Ö±äÁ¿ºÍº¯ÊıÉùÃ÷
+// SDå¡æŒ‡ä»¤è¡¨
+#define CMD0    0       // å¡å¤ä½
+#define CMD8    8       // å‘é€æ¥å£æ¡ä»¶
+#define CMD55   55      // APPå‘½ä»¤å‰ç¼€
+#define CMD41   41      // åˆå§‹åŒ–å‘½ä»¤
+#define CMD58   58      // è¯»OCRå¯„å­˜å™¨
+#define CMD17   17      //å‘½ä»¤17ï¼Œè¯»sector
+#define CMD24   24      //å‘½ä»¤24ï¼Œå†™sector
+#define CMD9    9       //å‘½ä»¤9 ï¼Œè¯»CSDæ•°æ®
+#define CMD12   12      //åœæ­¢æ•°æ®ä¼ é€
+// å…¨å±€å˜é‡å’Œå‡½æ•°å£°æ˜
 extern SPI_HandleTypeDef hspi1;
 extern uint8_t SD_Type;
 

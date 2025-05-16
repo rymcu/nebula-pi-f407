@@ -1,12 +1,12 @@
 #include "bsp_sd_card.h"
 #include <string.h>
 
-// SPI¾ä±úºÍÆ¬Ñ¡Òı½Å¶¨Òå
-//SPI_HandleTypeDef hspi1;  // ÓÉCubeMXÉú³É
+// SPIå¥æŸ„å’Œç‰‡é€‰å¼•è„šå®šä¹‰
+//SPI_HandleTypeDef hspi1;  // ç”±CubeMXç”Ÿæˆ
 #define SD_CS_PORT       GPIOC
 #define SD_CS_PIN        GPIO_PIN_4
 
-// Ë½ÓĞº¯ÊıÉùÃ÷
+// ç§æœ‰å‡½æ•°å£°æ˜
 uint8_t SD_CS_Enable(void);
 static void SD_CS_Disable(void);
 static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg, uint8_t crc);
@@ -14,11 +14,11 @@ static uint8_t SD_GetResponse(uint8_t response, uint32_t timeout);
 static uint8_t SD_ReadData(uint8_t *buf, uint16_t len);
 static uint8_t SD_WriteData(const uint8_t *buf, uint16_t len);
 
-// SD¿¨ÀàĞÍ
+// SDå¡ç±»å‹
 uint8_t SD_Type = 0;
 
 //-----------------------------------------------------
-// µÈ´ı×¼±¸ºÃ
+// ç­‰å¾…å‡†å¤‡å¥½
 //-----------------------------------------------------
 uint8_t SD_Wait_Ready(void)
 {
@@ -29,25 +29,25 @@ uint8_t SD_Wait_Ready(void)
     retries--;
   } while ((r1!=0xFF) && retries);
 
-  return r1;//ÕıÈ··µ»Ø0xFF
+  return r1;//æ­£ç¡®è¿”å›0xFF
 }
 //-----------------------------------------------------
-// Æ¬Ñ¡¿ØÖÆ
+// ç‰‡é€‰æ§åˆ¶
 //-----------------------------------------------------
 static void SD_CS_Disable(void) {
   HAL_GPIO_WritePin(SD_CS_PORT, SD_CS_PIN, GPIO_PIN_SET);
-	SPI_ReadWriteByte(0xFF);//ÑÓ³Ù8¸öÊ±ÖÓ
+	SPI_ReadWriteByte(0xFF);//å»¶è¿Ÿ8ä¸ªæ—¶é’Ÿ
 }
 
 uint8_t SD_CS_Enable(void) {
   HAL_GPIO_WritePin(SD_CS_PORT, SD_CS_PIN, GPIO_PIN_RESET);
-  if(0xFF == SD_Wait_Ready()) return 0x00;//Æ¬Ñ¡³É¹¦
+  if(0xFF == SD_Wait_Ready()) return 0x00;//ç‰‡é€‰æˆåŠŸ
 	SD_CS_Disable();
-	return 1;//Æ¬Ñ¡Ê§°Ü
+	return 1;//ç‰‡é€‰å¤±è´¥
 	
 }
 //-----------------------------------------------------
-// SPI¶ÁĞ´µ¥×Ö½Ú
+// SPIè¯»å†™å•å­—èŠ‚
 //-----------------------------------------------------
  uint8_t SPI_ReadWriteByte(uint8_t data) {
   uint8_t rx_data;
@@ -56,14 +56,14 @@ uint8_t SD_CS_Enable(void) {
 }
 
 //-----------------------------------------------------
-// ·¢ËÍSD¿¨ÃüÁî
+// å‘é€SDå¡å‘½ä»¤
 //-----------------------------------------------------
 static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg, uint8_t crc) {
   uint8_t tx_buf[6];
   uint8_t r1;
   SD_CS_Disable();
-	if(SD_CS_Enable()) return 0xFF;//Æ¬Ñ¡Ê§°Ü
-  // ¹¹ÔìÃüÁî°ü
+	if(SD_CS_Enable()) return 0xFF;//ç‰‡é€‰å¤±è´¥
+  // æ„é€ å‘½ä»¤åŒ…
   tx_buf[0] = cmd | 0x40;
   tx_buf[1] = (arg >> 24) & 0xFF;
   tx_buf[2] = (arg >> 16) & 0xFF;
@@ -74,7 +74,7 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg, uint8_t crc) {
   SD_CS_Enable();
   HAL_SPI_Transmit(&hspi1, tx_buf, 6, 100);
 	if(cmd==CMD12)SPI_ReadWriteByte(0xff);
-  // µÈ´ıÏìÓ¦
+  // ç­‰å¾…å“åº”
   uint32_t retries = 0x1F;
   do {
     r1 = SPI_ReadWriteByte(0xFF);
@@ -85,35 +85,35 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg, uint8_t crc) {
 }
 
 //-----------------------------------------------------
-// SD¿¨³õÊ¼»¯
+// SDå¡åˆå§‹åŒ–
 //-----------------------------------------------------
 uint8_t SD_Init(void) {
   uint8_t r1;
   uint32_t retries;
   uint8_t ocr[4];
 
-  // ÅäÖÃSPIµÍËÙÄ£Ê½£¨CubeMXÄ¬ÈÏÅäÖÃ£©
+  // é…ç½®SPIä½é€Ÿæ¨¡å¼ï¼ˆCubeMXé»˜è®¤é…ç½®ï¼‰
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256;
   HAL_SPI_Init(&hspi1);
 
-  // ·¢ËÍÖÁÉÙ74¸öÊ±ÖÓÂö³å
+  // å‘é€è‡³å°‘74ä¸ªæ—¶é’Ÿè„‰å†²
   SD_CS_Disable();
   for (int i=0; i<10; i++) SPI_ReadWriteByte(0xFF);
 
-  // CMD0: ¸´Î»µ½¿ÕÏĞ×´Ì¬
+  // CMD0: å¤ä½åˆ°ç©ºé—²çŠ¶æ€
   retries = 20;
   do {
     r1 = SD_SendCmd(CMD0, 0, 0x95);
   } while (r1 != 0x01 && retries--);
   if (r1 != 0x01) return 1;
 
-  // CMD8: ¼ì²éSD¿¨°æ±¾
+  // CMD8: æ£€æŸ¥SDå¡ç‰ˆæœ¬
   if (SD_SendCmd(CMD8, 0x1AA, 0x87) == 0x01) {
     // SD V2.0+
     for (int i=0; i<4; i++) ocr[i] = SPI_ReadWriteByte(0xFF);
     if (ocr[2] != 0x01 || ocr[3] != 0xAA) return 2;
 
-    // ACMD41³õÊ¼»¯
+    // ACMD41åˆå§‹åŒ–
     retries = 0xFFF;
     do {
       SD_SendCmd(CMD55, 0, 0x01);
@@ -121,18 +121,18 @@ uint8_t SD_Init(void) {
     } while (r1 != 0x00 && retries--);
     if (retries == 0) return 3;
 
-    // ¼ì²éÊÇ·ñÖ§³Ö¸ßÈİÁ¿
+    // æ£€æŸ¥æ˜¯å¦æ”¯æŒé«˜å®¹é‡
     SD_SendCmd(CMD58, 0, 0x01);
     for (int i=0; i<4; i++) ocr[i] = SPI_ReadWriteByte(0xFF);
     SD_Type = (ocr[0] & 0x40) ? SD_TYPE_V2HC : SD_TYPE_V2;
   } else {
-    // SD V1.x»òMMC¿¨
+    // SD V1.xæˆ–MMCå¡
     SD_SendCmd(CMD55, 0, 0x01);
     r1 = SD_SendCmd(CMD41, 0, 0x01);
     SD_Type = (r1 <= 1) ? SD_TYPE_V1 : SD_TYPE_MMC;
   }
 
-  // ÇĞ»»SPIµ½¸ßËÙÄ£Ê½
+  // åˆ‡æ¢SPIåˆ°é«˜é€Ÿæ¨¡å¼
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   HAL_SPI_Init(&hspi1);
   SD_CS_Disable();
@@ -140,29 +140,29 @@ uint8_t SD_Init(void) {
 }
 
 //-----------------------------------------------------
-// ¶ÁÈ¡µ¥¸ö¿é£¨512×Ö½Ú£©
+// è¯»å–å•ä¸ªå—ï¼ˆ512å­—èŠ‚ï¼‰
 //-----------------------------------------------------
 uint8_t SD_ReadBlock(uint32_t block_addr, uint8_t *buf) {
-  if (SD_Type != SD_TYPE_V2HC) block_addr <<= 9; // ×Ö½ÚµØÖ·×ª»»
+  if (SD_Type != SD_TYPE_V2HC) block_addr <<= 9; // å­—èŠ‚åœ°å€è½¬æ¢
 
   uint8_t r1 = SD_SendCmd(CMD17, block_addr, 0x01);
   if (r1 != 0x00) return 1;
 
-  // µÈ´ıÊı¾İÁîÅÆ
+  // ç­‰å¾…æ•°æ®ä»¤ç‰Œ
   uint32_t timeout = 100000;
   while (SPI_ReadWriteByte(0xFF) != 0xFE && timeout--);
   if (!timeout) return 2;
 
-  // ¶ÁÈ¡Êı¾İ
+  // è¯»å–æ•°æ®
   HAL_SPI_Receive(&hspi1, buf, 512, 100);
-  SPI_ReadWriteByte(0xFF); // ºöÂÔCRC
+  SPI_ReadWriteByte(0xFF); // å¿½ç•¥CRC
   SPI_ReadWriteByte(0xFF);
   SD_CS_Disable();
   return 0;
 }
 
 //-----------------------------------------------------
-// Ğ´Èëµ¥¸ö¿é£¨512×Ö½Ú£©
+// å†™å…¥å•ä¸ªå—ï¼ˆ512å­—èŠ‚ï¼‰
 //-----------------------------------------------------
 uint8_t SD_WriteBlock(uint32_t block_addr, const uint8_t *buf) {
   if (SD_Type != SD_TYPE_V2HC) block_addr <<= 9;
@@ -170,11 +170,11 @@ uint8_t SD_WriteBlock(uint32_t block_addr, const uint8_t *buf) {
   uint8_t r1 = SD_SendCmd(CMD24, block_addr, 0x01);
   if (r1 != 0x00) return 1;
 
-  // ·¢ËÍÊı¾İÇ°×º
+  // å‘é€æ•°æ®å‰ç¼€
   SPI_ReadWriteByte(0xFE);
   HAL_SPI_Transmit(&hspi1, (uint8_t*)buf, 512, 100);
 
-  // ·¢ËÍÎ±CRCºÍ¼ì²éÏìÓ¦
+  // å‘é€ä¼ªCRCå’Œæ£€æŸ¥å“åº”
   SPI_ReadWriteByte(0xFF);
   SPI_ReadWriteByte(0xFF);
   uint8_t resp = SPI_ReadWriteByte(0xFF);
@@ -183,42 +183,42 @@ uint8_t SD_WriteBlock(uint32_t block_addr, const uint8_t *buf) {
   SD_CS_Disable();
   return 0;
 }
-// sd_card.c ÖĞÌí¼ÓÒÔÏÂ´úÂë
+// sd_card.c ä¸­æ·»åŠ ä»¥ä¸‹ä»£ç 
 
-// ´ÓCSD¼Ä´æÆ÷»ñÈ¡ÈİÁ¿£¨ÉÈÇøÊı£©
+// ä»CSDå¯„å­˜å™¨è·å–å®¹é‡ï¼ˆæ‰‡åŒºæ•°ï¼‰
 uint32_t SD_GetCapacity(void) {
     uint8_t csd[16];
     uint32_t capacity = 0;
     uint8_t ret;
 
     SD_CS_Enable();
-    ret = SD_SendCmd(CMD9, 0, 0x01); // ·¢ËÍCMD9¶ÁÈ¡CSD
+    ret = SD_SendCmd(CMD9, 0, 0x01); // å‘é€CMD9è¯»å–CSD
     if (ret != 0x00) {
         SD_CS_Disable();
-        return 0; // ¶ÁÈ¡Ê§°Ü
+        return 0; // è¯»å–å¤±è´¥
     }
 
-    // µÈ´ıÊı¾İÁîÅÆ0xFE
+    // ç­‰å¾…æ•°æ®ä»¤ç‰Œ0xFE
     uint32_t timeout = 100000;
     while (SPI_ReadWriteByte(0xFF) != 0xFE && timeout--);
     if (!timeout) {
         SD_CS_Disable();
-        return 0; // ³¬Ê±
+        return 0; // è¶…æ—¶
     }
 
-    // ¶ÁÈ¡16×Ö½ÚCSDÊı¾İ
+    // è¯»å–16å­—èŠ‚CSDæ•°æ®
     HAL_SPI_Receive(&hspi1, csd, 16, 100);
-    SPI_ReadWriteByte(0xFF); // ºöÂÔCRC
+    SPI_ReadWriteByte(0xFF); // å¿½ç•¥CRC
     SPI_ReadWriteByte(0xFF);
     SD_CS_Disable();
 
-    // ½âÎöCSDÊı¾İ
-    if ((csd[0] & 0xC0) == 0x40) { // SDHC/SDXC¿¨£¨CSD°æ±¾2.0£©
+    // è§£æCSDæ•°æ®
+    if ((csd[0] & 0xC0) == 0x40) { // SDHC/SDXCå¡ï¼ˆCSDç‰ˆæœ¬2.0ï¼‰
         uint32_t csize = ((uint32_t)(csd[7] & 0x3F) << 16) 
                        | ((uint32_t)csd[8] << 8)
                        | csd[9];
-        capacity = (csize + 1) * 1024; // Ã¿¿é´óĞ¡¹Ì¶¨Îª512×Ö½Ú£¬¹ÊÈİÁ¿ = (csize+1)*512*1024/512
-    } else { // ±ê×¼ÈİÁ¿¿¨£¨CSD°æ±¾1.0£©
+        capacity = (csize + 1) * 1024; // æ¯å—å¤§å°å›ºå®šä¸º512å­—èŠ‚ï¼Œæ•…å®¹é‡ = (csize+1)*512*1024/512
+    } else { // æ ‡å‡†å®¹é‡å¡ï¼ˆCSDç‰ˆæœ¬1.0ï¼‰
         uint8_t read_bl_len = csd[5] & 0x0F;
         uint16_t c_size = ((csd[6] & 0x03) << 10)
                         | (csd[7] << 2)
@@ -228,6 +228,6 @@ uint32_t SD_GetCapacity(void) {
         capacity = (uint32_t)(c_size + 1) << (c_size_mult + read_bl_len - 7);
     }
 
-    return capacity; // ·µ»Ø×ÜÉÈÇøÊı
+    return capacity; // è¿”å›æ€»æ‰‡åŒºæ•°
 }
 

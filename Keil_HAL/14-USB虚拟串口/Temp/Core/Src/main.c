@@ -19,26 +19,38 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "fatfs.h"
+#include "i2c.h"
+#include "spi.h"
+#include "usart.h"
 #include "usb_device.h"
+#include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdio.h"//printf������
+#include "stdio.h"//printf函数�?
+//添加头文件支�?
 #include "string.h"
-#include "bsp_spi_flash.h"//SPI flash����
+#include "bsp_spi_flash.h"//SPI flash驱动
 #include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-uint8_t rx_buff[100];  //���ջ���
-uint8_t rx_done = 0; //������ɱ�־
-uint8_t rx_cnt = 0;//�������ݳ���
+uint8_t rx_buff[100];  //接收缓存
+uint8_t rx_done = 0; //接收完成标志
+uint8_t rx_cnt = 0;//接收数据长度
+
+//IIC全局变量
+#define ADDR_WR_AT24CXX 0xA0 //写器件地�?
+#define ADDR_RD_AT24CXX 0xA1 //读器件地�?
+#define BuffSize 256
+uint8_t Wr_buff[BuffSize],Rd_buff[BuffSize];//读写数据buff
+ unsigned char USB_CDC_buff[] = {"STM32 HAL USB virtual port com test!\r\n"};
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-unsigned char USB_CDC_buff[] = {"STM32 HAL USB virtual port com test\r\n"};
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,25 +59,17 @@ unsigned char USB_CDC_buff[] = {"STM32 HAL USB virtual port com test\r\n"};
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-I2C_HandleTypeDef hi2c1;
-
-SPI_HandleTypeDef hspi1;
-
-UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-SPI_HandleTypeDef *hspi_flash = &hspi1; // ���붨��
+SPI_HandleTypeDef *hspi_flash = &hspi1; // 必须定义
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_USART1_UART_Init(void);
-static void MX_I2C1_Init(void);
-static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-void spi_flash_test(void);//SPI flash���Ժ���
-void FATFS_FLASH_Test(void);
+void FatFs_Test(void);
+void spi_flash_test(void);
+void E2PROM_I2C_Test(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -108,9 +112,9 @@ int main(void)
   MX_FATFS_Init();
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
-	//HAL_Delay(1000);	
-  //spi_flash_test();//SPI flash���Ժ���
-	FATFS_FLASH_Test();
+	//E2PROM_I2C_Test();
+	//spi_flash_test();
+	//FatFs_Test();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -120,8 +124,19 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    CDC_Transmit_FS(USB_CDC_buff, sizeof(USB_CDC_buff));
+		CDC_Transmit_FS(USB_CDC_buff, sizeof(USB_CDC_buff));
     HAL_Delay(2000);
+    if(rx_done == 1)//判读是否接收完成
+    {
+        rx_done = 0;//清除接收标志
+        //数据处理，打印接收长度�?�接收的数据
+        printf("length of rx data: %d!\r\n",rx_cnt);
+        for(int i = 0;i<rx_cnt;i++) printf("%c",rx_buff[i]);
+        printf("\r\n");
+
+        rx_cnt =0;//清除接收长度
+    } 
+    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin); // 切换亮�?�灭状�?�，添加此语句防止优�?   
   }
   /* USER CODE END 3 */
 }
@@ -134,18 +149,23 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 7;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -157,220 +177,13 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB;
-  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  HAL_RCC_MCOConfig(RCC_MCO, RCC_MCO1SOURCE_PLLCLK, RCC_MCODIV_1);
-}
-
-/**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_I2C1_Init(void)
-{
-
-  /* USER CODE BEGIN I2C1_Init 0 */
-
-  /* USER CODE END I2C1_Init 0 */
-
-  /* USER CODE BEGIN I2C1_Init 1 */
-
-  /* USER CODE END I2C1_Init 1 */
-  hi2c1.Instance = I2C1;
-  hi2c1.Init.ClockSpeed = 100000;
-  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
-  hi2c1.Init.OwnAddress1 = 0;
-  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
-  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
-  hi2c1.Init.OwnAddress2 = 0;
-  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
-  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN I2C1_Init 2 */
-
-  /* USER CODE END I2C1_Init 2 */
-
-}
-
-/**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_USART1_UART_Init(void)
-{
-
-  /* USER CODE BEGIN USART1_Init 0 */
-
-  /* USER CODE END USART1_Init 0 */
-
-  /* USER CODE BEGIN USART1_Init 1 */
-
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART1_Init 2 */
-  //���������жϣ������ж�
-  __HAL_UART_ENABLE_IT(&huart1,UART_IT_IDLE|UART_IT_RXNE);
-  /* USER CODE END USART1_Init 2 */
-
-}
-
-/**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_GPIO_Init(void)
-{
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
-
-  /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(USB_EN_GPIO_Port, USB_EN_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(WS2812_GPIO_Port, WS2812_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(FLASH_CS_GPIO_Port, FLASH_CS_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin : USB_EN_Pin */
-  GPIO_InitStruct.Pin = USB_EN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(USB_EN_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : WS2812_Pin */
-  GPIO_InitStruct.Pin = WS2812_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(WS2812_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : FLASH_CS_Pin */
-  GPIO_InitStruct.Pin = FLASH_CS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(FLASH_CS_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : K1_Pin */
-  GPIO_InitStruct.Pin = K1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(K1_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : K2_EXIT_Pin */
-  GPIO_InitStruct.Pin = K2_EXIT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(K2_EXIT_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA8 */
-  GPIO_InitStruct.Pin = GPIO_PIN_8;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : LED2_Pin */
-  GPIO_InitStruct.Pin = LED2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(LED2_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : LED1_Pin */
-  GPIO_InitStruct.Pin = LED1_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(LED1_GPIO_Port, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
-
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -379,23 +192,48 @@ static void MX_GPIO_Init(void)
 #else
 #define PUTCHAR_PROTOTYPE int fputc(int ch,FILE *f)
 #endif /* __GNUC__ */
-//�ض���printf����
+//重定向printf函数
 PUTCHAR_PROTOTYPE
 {
-    HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,HAL_MAX_DELAY);//���ָ�򴮿�USART1
+    HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,HAL_MAX_DELAY);//输出指向串口USART1
     return ch;
 }
-//��дGPIO�жϴ�����
+//重写GPIO中断处理函数
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-    //��תLED1
+    //翻转LED1
     HAL_GPIO_TogglePin(LED1_GPIO_Port,LED1_Pin);
-    //��ӡ�жϴ�����Ϣ
+    //打印中断处理信息
     printf("K2 ExTi interrput!\r\n");
+}
+
+//EEPROM测试
+void E2PROM_I2C_Test(void)
+{
+    HAL_StatusTypeDef error;
+    uint8_t length = 8 ;
+    for(uint16_t i = 0;i<256;i++) Wr_buff[i] = i;
+    //AT24Cxx地址00弿始写兿8Byte数据
+    error = HAL_I2C_Mem_Write(&hi2c1,ADDR_WR_AT24CXX,0x00,I2C_MEMADD_SIZE_16BIT,Wr_buff,length,1000);
+    if(error == HAL_OK) printf("e2prom write done!\r\n");
+    else                printf("e2prom write fail!\r\n");
+    HAL_Delay(1000);
+    //从地�?0x00弿始�?8Byte数据，并打印�?
+    error = HAL_I2C_Mem_Read(&hi2c1,ADDR_RD_AT24CXX,0x00,I2C_MEMADD_SIZE_16BIT,Rd_buff,length,1000);
+    if(error == HAL_OK)
+    {
+        printf("e2prom read done!\r\n");
+        for(uint16_t i=0;i<length;i++)
+        {
+            printf("0x%02x ",Rd_buff[i]);
+        }
+        printf("\r\n");
+    }
+    else  printf("e2prom write fail!\r\n");
 }
 void spi_flash_test(void)
 {
-  /* ����Flash���� */
+  /* 测试Flash驱动 */
   uint16_t manu_id, dev_id;
   uint8_t jedec_id[3];
   uint8_t write_buf[256] = {0xAA, 0xBB, 0xCC, 0xDD};
@@ -413,78 +251,96 @@ void spi_flash_test(void)
   }
   printf("Flash Write Data: 0x%02X, 0x%02X, 0x%02X, 0x%02X\r\n", write_buf[0], write_buf[1], write_buf[2], write_buf[3]);
   printf("Flash Read  Data: 0x%02X, 0x%02X, 0x%02X, 0x%02X\r\n", read_buf[0], read_buf[1], read_buf[2], read_buf[3]);
-  // ��֤����
+  // 验证数据
   if (memcmp(write_buf, read_buf, 4) == 0) {
     printf("\r\nSPI Flash Test Passed!\r\n");
   }
-}
+} 
 
-// FATFS����
-void FATFS_FLASH_Test(void)
-{
-  static FATFS fs;                                                              // �ļ�ϵͳ����
-  static FIL fnew;                                                       // �ļ�����
-  BYTE FATFS_Wr_Buff[128] = "hello, www.rymcu.com make it easy!have fun.\r\n"; // д������
-  BYTE FATFS_Rd_Buff[128] = {0};                                         // ��������
-  UINT fnum;                                                             // �ɹ���д����
-  FRESULT res;                                                           // ����
+FATFS fs;       // 文件系统对象
+FIL fil;        // 文件对象
+FRESULT res;    // FatFs 函数返回�?
+uint8_t work_buf[4096]; // 定义工作缓冲区（�?足够大，建议4KB以上�?
 
-  printf("\r\n\r\n------------------FLASH FATFS TEST------------------\r\n\r\n");
-  res = f_mount(&fs, "0:", 1);
-  if (res == FR_NO_FILESYSTEM)
-  {
-    printf("no file system,begin mkfs\r\n");
-    res = f_mkfs("0:", 0, 0); //��ʽ��
-    if (res == FR_OK)
-    {
-      printf("file system mkfs ok\r\n");
-      // ��ʽ���ɹ�����ȡ���������¹��أ�
-      res = f_mount(NULL, "0:", 1);
-      printf("cancel mount ok:%d\r\n", res);
-      res = f_mount(&fs, "0:", 1);
-      printf("re-mount ok:%d\r\n", res);
+void FatFs_Test(void) {
+    // 步骤1：首次尝试挂载文件系统（不自动格式化�?
+    res = f_mount(&fs, "0:", 1);  // 第三个参�?0：不自动格式�?
+    if (res == FR_OK) {
+        printf("f_mount ok\n");
+    } else {
+        printf("f_mount failed: 0x%02X\n", res);
+
+        // 步骤2：若因未初始化文件系统（FR_NO_FILESYSTEM），尝试格式�?
+        if (res == FR_NO_FILESYSTEM) {
+            printf("FR_NO_FILESYSTEM,begin f_mkfs...\n");
+            
+            // 格式化参数：自动选择FAT类型（FM_ANY），快�?�格式化（FM_SFD�?
+            res = f_mkfs("0:", FM_ANY | FM_SFD, 0, work_buf, sizeof(work_buf));
+            
+            if (res == FR_OK) {
+                printf("f_mkfs ok,f_mount again...\n");
+                res = f_mount(&fs, "0:", 1);  // 重新挂载（自动格式化已完成）
+                if (res == FR_OK) {
+                    printf("f_mount ok\n");
+                } else {
+                    printf("f_mount failed: 0x%02X\n", res);
+                    return;
+                }
+            } else {
+                printf("f_mkfs failed: 0x%02X\n", res);
+                return;
+            }
+        } else {
+            // 其他错误（如设备未就绪�?�硬件错误）
+            printf("can not f_mkfs\n");
+            return;
+        }
     }
-    else
-    {
-      printf("failed mount\r\n");
+
+    // 步骤3：文件读写测�?
+    res = f_open(&fil, "test.txt", FA_CREATE_ALWAYS | FA_WRITE);
+    if (res != FR_OK) {
+        printf("f_open test.txt failed: 0x%02X\n", res);
+			return;
     }
-  }
-  else
-  {
-    printf("file system alreadly existed.\r\n");
-  }
-  printf("\r\n\r\n-------------------FATFS write test-------------------\r\n");
-  // ���ļ����ļ��������򴴽�����
-  res = f_open(&fnew, "RY.txt", FA_CREATE_ALWAYS | FA_WRITE);
-  if (res == FR_OK)
-    printf("open or create RY.txt ok.\r\n");
-  else
-    printf("open or create file failed\r\n");
-  // д����
-  res = f_write(&fnew, FATFS_Wr_Buff, sizeof(FATFS_Wr_Buff), &fnum);
-  if (res == FR_OK)
-    printf("write to RY.txt:\r\n%s", FATFS_Wr_Buff);
-  else
-    printf("failed to write RY.txt,code: %d!\r\n", res);
-  // ���д�����󣬹ر��ļ�
-  f_close(&fnew);
-  printf("\r\n-------------------FATFS read test-------------------\r\n\r\n");
-  // ���ļ�������ʽ���Ѵ������ļ�
-  res = f_open(&fnew, "RY.txt", FA_OPEN_EXISTING | FA_READ);
-  if (res != FR_OK)
-  {
-    printf("open RY.txt failed\r\n");
-    return;
-  }
-  // ��ȡ�ļ�����
-  res = f_read(&fnew, FATFS_Rd_Buff, sizeof(FATFS_Rd_Buff), &fnum);
-  if (res != FR_OK)
-  {
-    printf("read file failed\r\n");
-    return;
-  }
-  printf("read file data:\r\n%s\r\n", FATFS_Rd_Buff);
-  f_close(&fnew); // ��ȡ��ϣ��ر��ļ�
+		else
+		{
+			printf("f_open ok\n");
+		}
+
+    char *msg = "Hello, SPI Flash with FatFs  rymcu.com!";
+    UINT bytes_written;
+    res = f_write(&fil, msg, strlen(msg), &bytes_written);
+    if (res != FR_OK) {
+        printf("f_write failed: 0x%02X\n", res);
+        f_close(&fil);
+        return;
+    }
+    printf("f_write ok: %d\n", bytes_written);
+    f_close(&fil);
+
+    // 步骤4：读取验�?
+    res = f_open(&fil, "test.txt", FA_READ);
+    if (res != FR_OK) {
+        printf("f_open failed: 0x%02X\n", res);
+        return;
+    }
+
+    static char buf[200];
+    UINT bytes_read;
+    res = f_read(&fil, buf, sizeof(buf)-1, &bytes_read);
+    if (res != FR_OK) {
+        printf("f_read failed: 0x%02X\n", res);
+        f_close(&fil);
+        return;
+    }
+    buf[bytes_read] = '\0';
+    printf("f_read: %s\n", buf);
+    f_close(&fil);
+
+    // 步骤5：卸载文件系�?
+    f_mount(NULL, "0:", 0);
+    printf("test done\n\n");
 }
 
 /* USER CODE END 4 */

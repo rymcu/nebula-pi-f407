@@ -31,7 +31,7 @@
 #endif
 
 /* USER CODE BEGIN DECL */
-#include "bsp_spi_flash.h" //���FLASH����
+#include "bsp_spi_flash.h"//添加FLASH驱动
 /* Includes ------------------------------------------------------------------*/
 #include <string.h>
 #include "ff_gen_drv.h"
@@ -77,25 +77,25 @@ Diskio_drvTypeDef  USER_Driver =
   * @retval DSTATUS: Operation status
   */
 DSTATUS USER_initialize (
-	BYTE pdrv           /* Physical drive nmuber to identify the drive */
+    BYTE pdrv           /* Physical drive nmuber to identify the drive */
 )
 {
   /* USER CODE BEGIN INIT */
-  Stat = STA_NOINIT;
-  // ��Ӵ���
-  switch (pdrv)
-  {
-  case 1: // SD
-    Stat = RES_PARERR;
-    break;
-  case 0: // Flash��������ʹ��������0
-    // main�������Զ�������W25Q64�ĳ�ʼ�����룬ֱ�ӷ��سɹ���
-    Stat = RES_OK;
-    break;
-  default:
-    Stat = RES_PARERR;
-  }
-  return Stat;
+    Stat = STA_NOINIT;
+    //添加代码
+    switch (pdrv)
+    {
+        case 1://SD
+            Stat = RES_PARERR;
+            break;
+        case 0://Flash，工程中使用驱动器0
+            //main函数中自动生成了W25Q64的初始化代码，直接返回成功。
+            Stat = RES_OK;
+            break;
+        default:
+            Stat = RES_PARERR;
+    }
+    return Stat;
   /* USER CODE END INIT */
 }
 
@@ -105,15 +105,14 @@ DSTATUS USER_initialize (
   * @retval DSTATUS: Operation status
   */
 DSTATUS USER_status (
-	BYTE pdrv       /* Physical drive number to identify the drive */
+    BYTE pdrv       /* Physical drive number to identify the drive */
 )
 {
   /* USER CODE BEGIN STATUS */
-  Stat = STA_NOINIT;
-  // ������������״̬��������ʹ����������0
-  if (pdrv == 0)
-    Stat = RES_OK; // main�������Զ�������FLASH��ʼ�����룬ֱ�ӷ��سɹ���
-  return Stat;
+    Stat = STA_NOINIT;
+    //返回启动器的状态，工程中使用了驱动器0
+    if(pdrv==0) Stat = RES_OK;//main函数中自动生成了FLASH初始化代码，直接返回成功。
+    return Stat;
   /* USER CODE END STATUS */
 }
 
@@ -126,28 +125,27 @@ DSTATUS USER_status (
   * @retval DRESULT: Operation result
   */
 DRESULT USER_read (
-	BYTE pdrv,      /* Physical drive nmuber to identify the drive */
-	BYTE *buff,     /* Data buffer to store read data */
-	DWORD sector,   /* Sector address in LBA */
-	UINT count      /* Number of sectors to read */
+    BYTE pdrv,      /* Physical drive nmuber to identify the drive */
+    BYTE *buff,     /* Data buffer to store read data */
+    DWORD sector,   /* Sector address in LBA */
+    UINT count      /* Number of sectors to read */
 )
 {
   /* USER CODE BEGIN READ */
-  // ���FLASH������
-  if (pdrv == 0)
+  //添加FLASH读函数
+  if(pdrv==0)
   {
-    // ���ö����ݺ�����ֵ��ע�����sectorָ����0-2047������һ����������W25Q64ʵ��������ַ����һ������
-    // һ��������Ӧ4096���ֽڣ���ˣ������ַΪsector*4096��countͬ��
-    Flash_ReadData(sector * 4096, (uint8_t *)buff, count * 4096);
-    return RES_OK;
+      //调用读数据函数，值得注意的是sector指的是0-2047，即哪一个扇区，与W25Q64实际扇区地址不是一个概念
+      //一个扇区对应4096个字节，因此，输入地址为sector*4096，count同理。
+      Flash_ReadData(sector * 4096, (uint8_t *)buff, count * 4096);
+      return RES_OK;
   }
   else
   {
-    return RES_PARERR;
+      return RES_PARERR;
   }
   /* USER CODE END READ */
 }
-
 /**
   * @brief  Writes Sector(s)
   * @param  pdrv: Physical drive number (0..)
@@ -158,28 +156,27 @@ DRESULT USER_read (
   */
 #if _USE_WRITE == 1
 DRESULT USER_write (
-	BYTE pdrv,          /* Physical drive nmuber to identify the drive */
-	const BYTE *buff,   /* Data to be written */
-	DWORD sector,       /* Sector address in LBA */
-	UINT count          /* Number of sectors to write */
+    BYTE pdrv,          /* Physical drive nmuber to identify the drive */
+    const BYTE *buff,   /* Data to be written */
+    DWORD sector,       /* Sector address in LBA */
+    UINT count          /* Number of sectors to write */
 )
 {
   /* USER CODE BEGIN WRITE */
-  /* USER CODE HERE */
-  if (pdrv == 0)
+  if(pdrv==0)
   {
-    // ���д����
-    // FLASHд����ǰ��Ҫ����������������Ҫ����count����������USER_ioctl������
-    // ������GET_BLOCK_SIZEΪ1,�����ζ�д����������������Ϊ1������countֵ
-    // ʼ��Ϊ1�����ֻ��Ҫ����һ�������������ɡ�
-    Flash_SectorErase(sector * 4096);
-    FLASH_WriteData(sector * 4096, (uint8_t *)buff, count * 4096);
-    /* USER CODE HERE */
-    return RES_OK;
+      //添加写函数
+      //FLASH写操作前需要进行扇区擦除，需要擦除count个扇区，在USER_ioctl函数中
+      //设置了GET_BLOCK_SIZE为1,即单次读写操作擦除扇区个数为1，所以count值
+      //始终为1，因此只需要调用一次扇区擦除即可。
+      Flash_SectorErase(sector * 4096);
+    	FLASH_WriteData(sector * 4096, (uint8_t *)buff, count * 4096);
+      /* USER CODE HERE */
+      return RES_OK;
   }
   else
   {
-    return RES_PARERR;
+      return RES_PARERR;
   }
   /* USER CODE END WRITE */
 }
@@ -194,42 +191,40 @@ DRESULT USER_write (
   */
 #if _USE_IOCTL == 1
 DRESULT USER_ioctl (
-	BYTE pdrv,      /* Physical drive nmuber (0..) */
-	BYTE cmd,       /* Control code */
-	void *buff      /* Buffer to send/receive control data */
+    BYTE pdrv,      /* Physical drive nmuber (0..) */
+    BYTE cmd,       /* Control code */
+    void *buff      /* Buffer to send/receive control data */
 )
 {
   /* USER CODE BEGIN IOCTL */
-  DRESULT res = RES_ERROR;
-  // ��ȡFLASH����
-  if (pdrv == 0)
-  {
-    switch (cmd)
-    {
-    case CTRL_SYNC:
-      res = RES_OK;
-      break;
-    case GET_SECTOR_SIZE:
-      *(DWORD *)buff = 4096; // W25Q64ÿ����Ϊ4096Byte
-      res = RES_OK;
-      break;
-    case GET_SECTOR_COUNT:
-      *(DWORD *)buff = 2048; // W25Q64����Ϊ8MB������2048������
-      res = RES_OK;
-      break;
-    case GET_BLOCK_SIZE:
-      *(DWORD *)buff = 1; // ���ζ�д����������������
-      res = RES_OK;
-      break;
-    default:
-      res = RES_PARERR;
+    DRESULT res = RES_ERROR;
+    //获取FLASH参数
+    if(pdrv==0) {
+        switch (cmd) {
+            case CTRL_SYNC:
+                res = RES_OK;
+                break;
+            case GET_SECTOR_SIZE:
+                *(DWORD *) buff = 4096;//W25Q64每扇区为4096Byte
+                res = RES_OK;
+                break;
+            case GET_SECTOR_COUNT:
+                *(DWORD *) buff = 2048;//W25Q64容量为8MB，共计2048个扇区
+                res = RES_OK;
+                break;
+            case GET_BLOCK_SIZE:
+                *(DWORD *) buff = 1;//单次读写操作擦除扇区个数
+                res = RES_OK;
+                break;
+            default:
+                res = RES_PARERR;
+        }
     }
-  }
-  else
-  {
-    res = RES_PARERR;
-  }
-  return res;
+    else
+    {
+        res = RES_PARERR;
+    }
+    return res;
   /* USER CODE END IOCTL */
 }
 #endif /* _USE_IOCTL == 1 */

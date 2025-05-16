@@ -27,7 +27,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -36,10 +36,10 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
-extern uint8_t rx_buff[100];  
-extern uint8_t rx_done; 
-extern uint8_t rx_cnt;
+//全局变量定义
+extern uint8_t rx_buff[100];  //接收缓存
+extern uint8_t rx_done; //接收完成标志
+extern uint8_t rx_cnt;//接收数据长度
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -60,12 +60,15 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define WS2812_Pin GPIO_PIN_13
+#define WS2812_GPIO_Port GPIOC
 #define FLASH_CS_Pin GPIO_PIN_1
 #define FLASH_CS_GPIO_Port GPIOA
 #define K1_Pin GPIO_PIN_2
 #define K1_GPIO_Port GPIOA
-#define K2_Pin GPIO_PIN_3
-#define K2_GPIO_Port GPIOA
+#define K2_EXIT_Pin GPIO_PIN_3
+#define K2_EXIT_GPIO_Port GPIOA
+#define K2_EXIT_EXTI_IRQn EXTI3_IRQn
 #define SD_CS_Pin GPIO_PIN_4
 #define SD_CS_GPIO_Port GPIOC
 #define LED2_Pin GPIO_PIN_6

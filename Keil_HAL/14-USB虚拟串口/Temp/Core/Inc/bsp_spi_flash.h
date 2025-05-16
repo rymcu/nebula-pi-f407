@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 
 /* 硬件相关配置（根据实际引脚修改） */
 #define FLASH_CS_PORT        GPIOA
