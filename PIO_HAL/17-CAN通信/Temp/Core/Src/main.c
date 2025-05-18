@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdio.h" //printf函数�??
+#include "stdio.h" //printf函数�??
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -196,7 +196,7 @@ static void MX_CAN_Init(void)
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN1;
   hcan.Init.Prescaler = 9;
-  hcan.Init.Mode = CAN_MODE_LOOPBACK;
+  hcan.Init.Mode = CAN_MODE_NORMAL;//CAN_MODE_LOOPBACK;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan.Init.TimeSeg1 = CAN_BS1_5TQ;
   hcan.Init.TimeSeg2 = CAN_BS2_2TQ;
@@ -211,7 +211,7 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
-    //�?启中�?,FIFO 0接收消息中断
+    //�?启中�?,FIFO 0接收消息中断
     HAL_CAN_ActivateNotification(&hcan,CAN_IT_RX_FIFO0_MSG_PENDING);
     HAL_CAN_Start(&hcan);
   /* USER CODE END CAN_Init 2 */
@@ -246,7 +246,7 @@ static void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-  // �??启接收中断，空闲中断
+  // �??启接收中断，空闲中断
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE | UART_IT_RXNE);
   /* USER CODE END USART1_Init 2 */
 
@@ -320,7 +320,7 @@ PUTCHAR_PROTOTYPE
 {
     HAL_StatusTypeDef HAL_Status;
     CAN_FilterTypeDef Filter0;
-    Filter0.FilterBank = 1;//滤波器编�?
+    Filter0.FilterBank = 1;//滤波器编�?
     Filter0.FilterMode = CAN_FILTERMODE_IDMASK;
     Filter0.FilterScale = CAN_FILTERSCALE_32BIT;
     Filter0.FilterIdHigh = 0x00;
@@ -353,7 +353,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 }
 void CAN_Test(void)
 {
-    //发�?�数据CAN
+    //发�?�数据CAN
     TxHeaderCAN.ExtId = 0x1800F001;
     TxHeaderCAN.DLC = 8;
     TxHeaderCAN.IDE = CAN_ID_STD;

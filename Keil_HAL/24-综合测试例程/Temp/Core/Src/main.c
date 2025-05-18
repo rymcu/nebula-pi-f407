@@ -32,23 +32,26 @@
 #include "lv_port_indev.h"
 #include "bsp_ft6336_lcd.h"
 #include "bsp_oled.h"
-#include "rtthread.h"  // 先包�? RT-Thread，确�? rt_malloc 等函数声明有�?
-#include "lvgl.h"  // 包含 LVGL 头文件，此时宏已生效
+#include "rtthread.h"  
+#include "lvgl.h"  // add after #include "rtthread.h" 
 #include "my_lvgl_app.h"
 #include "bsp_rgb.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-uint8_t rx_buff[100];  
-uint8_t rx_done = 0; 
-uint8_t rx_cnt = 0;
-
+uint8_t rx_buff[100];  //接收缓存
+uint8_t rx_done = 0; //接收完成标志
+uint8_t rx_cnt = 0;//接收数据长度
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-//cubemxʱRT-Thread board.c SysTick_Handlerֶ lv_tick_inc(1);RT_HEAP_SIZE (54*1024)//ֶ
+/******************************************* Important:Manually add****************************************************
+cubemxʱRT-Thread board.c:
+	RT_HEAP_SIZE (54*1024)
+	SysTick_Handlerֶ()---->lv_tick_inc(1);
+***********************************************************************************************************************/
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -68,7 +71,6 @@ u8g2_t u8g2;
 uint8_t i;
 unsigned char str_temp[]="0";
 unsigned char str_temp_b[]="0";
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -181,6 +183,7 @@ int main(void)
 	
 	rt_thread_t lvgl_thread = rt_thread_create("lvgl",lvgl_thread_entry,RT_NULL, LVGL_THREAD_STACK_SIZE,LVGL_THREAD_PRIORITY,20);
   if (lvgl_thread != RT_NULL) {if(RT_EOK == rt_thread_startup(lvgl_thread)){rt_kprintf("lvgl_thread create ok!\n");}}else{rt_kprintf("Thread creation failed! Error code: %d\n", rt_get_errno());}
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -190,8 +193,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-			//HAL_GPIO_TogglePin(LED2_GPIO_Port,LED2_Pin);//rt_kprintf("rymcu rt-thread test!\n");
-      //rt_thread_delay(1000);
 		rt_kprintf("end of main thread!\n");
 		return 0;
 	}
@@ -206,18 +207,23 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
-  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -229,16 +235,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
-  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
@@ -250,10 +250,10 @@ void SystemClock_Config(void)
 #else
 #define PUTCHAR_PROTOTYPE int fputc(int ch,FILE *f)
 #endif /* __GNUC__ */
-
+//重定向printf函数
 PUTCHAR_PROTOTYPE
 {
-    HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,HAL_MAX_DELAY);//输出指向串口USART1
     return ch;
 }
 void my_print(lv_log_level_t level, const char * buf)

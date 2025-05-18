@@ -27,7 +27,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -36,10 +36,10 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-//ȫ�ֱ�������
-extern uint8_t rx_buff[100];  //���ջ���
-extern uint8_t rx_done; //������ɱ��?
-extern uint8_t rx_cnt;//�������ݳ���
+//全局变量定义
+extern uint8_t rx_buff[100];  //接收缓存
+extern uint8_t rx_done; //接收完成标志
+extern uint8_t rx_cnt;//接收数据长度
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -60,16 +60,24 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define CTP_SDA_Pin GPIO_PIN_2
+#define CTP_SDA_GPIO_Port GPIOE
+#define CTP_PEN_Pin GPIO_PIN_4
+#define CTP_PEN_GPIO_Port GPIOE
 #define K1_Pin GPIO_PIN_2
 #define K1_GPIO_Port GPIOA
 #define K2_Pin GPIO_PIN_3
 #define K2_GPIO_Port GPIOA
 #define LCD_BL_Pin GPIO_PIN_12
 #define LCD_BL_GPIO_Port GPIOD
+#define CTP_CS_Pin GPIO_PIN_13
+#define CTP_CS_GPIO_Port GPIOD
 #define LED2_Pin GPIO_PIN_6
 #define LED2_GPIO_Port GPIOD
 #define LED1_Pin GPIO_PIN_4
 #define LED1_GPIO_Port GPIOB
+#define CTP_SCL_Pin GPIO_PIN_0
+#define CTP_SCL_GPIO_Port GPIOE
 #define LCD_RST_Pin GPIO_PIN_1
 #define LCD_RST_GPIO_Port GPIOE
 

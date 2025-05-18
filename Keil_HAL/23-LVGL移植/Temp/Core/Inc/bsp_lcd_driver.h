@@ -1,7 +1,7 @@
 #ifndef __BSP_LCD_DRIVER_H
 #define __BSP_LCD_DRIVER_H
 
-#include "stm32f1xx_hal.h"
+#include "stm32f4xx_hal.h"
 
 //-------------------------------
 // 用户配置

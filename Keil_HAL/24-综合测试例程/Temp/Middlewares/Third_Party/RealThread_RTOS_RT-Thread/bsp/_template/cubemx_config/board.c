@@ -37,7 +37,7 @@ void SysTick_Handler(void)
     rt_interrupt_enter();
     
     rt_tick_increase();
-lv_tick_inc(1);
+		lv_tick_inc(1);
     rt_interrupt_leave();
 }
 

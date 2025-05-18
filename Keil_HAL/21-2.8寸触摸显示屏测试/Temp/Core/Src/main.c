@@ -24,15 +24,19 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stdio.h"
+#include "stdio.h"//printf函数�?
 #include "bsp_lcd_driver.h"
+#include "bsp_ft6336_lcd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-uint8_t rx_buff[100];  
-uint8_t rx_done = 0; 
-uint8_t rx_cnt = 0;
+uint8_t rx_buff[100];  //接收缓存
+uint8_t rx_done = 0; //接收完成标志
+uint8_t rx_cnt = 0;//接收数据长度
+
+int32_t x,y; //坐标
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -48,7 +52,7 @@ uint8_t rx_cnt = 0;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
- 
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,6 +98,10 @@ int main(void)
   MX_USART1_UART_Init();
   MX_FSMC_Init();
   /* USER CODE BEGIN 2 */
+
+  printf("hello,enjoy!\r\n");
+  HAL_Delay(1000);
+	FT6336_Init();
 	LCD_Init();
   printf("hello,enjoy!\r\n");
   HAL_Delay(1000);
@@ -127,16 +135,23 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    if(rx_done == 1)
+		if(CTP_TouchDetect())
+		{
+			FT6336_ReadXY(&x,&y,6);
+			printf("x:%d y:%d\n",x,y);
+		}
+		HAL_Delay(100);
+    if(rx_done == 1)//判读是否接收完成
     {
-        rx_done = 0;
+        rx_done = 0;//清除接收标志
+        //数据处理，打印接收长度�?�接收的数据
         printf("length of rx data: %d!\r\n",rx_cnt);
         for(int i = 0;i<rx_cnt;i++) printf("%c",rx_buff[i]);
         printf("\r\n");
 
-        rx_cnt =0;
+        rx_cnt =0;//清除接收长度
     } 
-    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin); 	
+    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin); // 切换亮�?�灭状�?�，添加此语句防止优�?   
   }
   /* USER CODE END 3 */
 }
@@ -150,16 +165,22 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_RCC_PWR_CLK_ENABLE();
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 168;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -171,10 +192,10 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
   {
     Error_Handler();
   }
@@ -186,10 +207,10 @@ void SystemClock_Config(void)
 #else
 #define PUTCHAR_PROTOTYPE int fputc(int ch,FILE *f)
 #endif /* __GNUC__ */
-
+//重定向printf函数
 PUTCHAR_PROTOTYPE
 {
-    HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,HAL_MAX_DELAY);//输出指向串口USART1
     return ch;
 }
 /* USER CODE END 4 */
